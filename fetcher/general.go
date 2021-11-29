@@ -26,6 +26,7 @@ const (
 const (
 	ContextUrl          = "https://context.app/api/profile/%s"
 	SuperrareUrl        = "https://superrare.com/api/v2/user?address=%s"
+	SybilVerifiedUrl    = "https://raw.githubusercontent.com/Uniswap/sybil-list/master/verified.json"
 	RaribleFollowingUrl = "https://api-mainnet.rarible.com/marketplace/api/v4/followings?owner=%s"
 	RaribleFollowerUrl  = "https://api-mainnet.rarible.com/marketplace/api/v4/followers?user=%s"
 )

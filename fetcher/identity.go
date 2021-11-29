@@ -20,7 +20,9 @@ func (f *fetcher) FetchIdentity(address string) (IdentityEntryList, error) {
 	// Superrare API
 	go f.processSuperrare(address, ch)
 	// Part 2 - Add other data source here
-	// TODO
+	// Bounty: https://gitcoin.co/issue/cyberconnecthq/indexer/1/100027190
+	// Contributor: jaredalonzo
+	go f.processSybil(address, ch)
 
 	// Final Part - Merge entry
 	for i := 0; i < IdentityApiCount; i++ {
@@ -180,6 +182,58 @@ func (f *fetcher) processSuperrare(address string, ch chan<- IdentityEntry) {
 		newSprRecord.TwitterLink != "" || newSprRecord.SteemitLink != "" || newSprRecord.Website != "" ||
 		newSprRecord.SpotifyLink != "" || newSprRecord.SoundCloudLink != "" {
 		result.Superrare = &newSprRecord
+	}
+
+	ch <- result
+}
+
+func (f *fetcher) processSybil(address string, ch chan<- IdentityEntry) {
+	var result IdentityEntry
+
+	body, err := sendRequest(f.httpClient, RequestArgs{
+		url:    fmt.Sprintf(SybilVerifiedUrl),
+		method: "GET",
+	})
+	if err != nil {
+		result.Err = err
+		result.Msg = "[processSybil] identity response failed"
+		ch <- result
+		return
+	}
+
+	/* The Sybil endpoint has the following structure:
+
+		"{address}": {
+	    "twitter": {
+	      "timestamp": {timestamp},
+	      "tweetID": "{tweet_id}",
+	      "handle": {twitter_handle}
+	    }
+	  }
+
+		I am unmapping the JSON object using a map[string]:map[string]:map[string]
+		which can then be indexed like this obj[{address}]["twitter"]["handle"]
+
+		If there is a match in the Sybil verified JSON endpoint, I then map the new
+		UserTwitterIdentity into result.Twitter
+	*/
+	sybilMap := make(map[string]map[string]map[string]interface{})
+	err = json.Unmarshal(body, &sybilMap)
+	if err != nil {
+		result.Err = err
+		result.Msg = "Unmapping Sybil response failed"
+	}
+
+	twitterHandle := sybilMap[address]["twitter"]["handle"]
+	if twitterHandle != nil {
+		newTwitterRecord := UserTwitterIdentity{
+			Handle:     convertTwitterHandle(twitterHandle.(string)),
+			DataSource: SYBIL,
+		}
+
+		if newTwitterRecord.Handle != "" {
+			result.Twitter = &newTwitterRecord
+		}
 	}
 
 	ch <- result
