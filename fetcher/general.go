@@ -28,6 +28,7 @@ const (
 	SuperrareUrl        = "https://superrare.com/api/v2/user?address=%s"
 	RaribleFollowingUrl = "https://api-mainnet.rarible.com/marketplace/api/v4/followings?owner=%s"
 	RaribleFollowerUrl  = "https://api-mainnet.rarible.com/marketplace/api/v4/followers?user=%s"
+	PoapUrl             = "https://api.poap.xyz/actions/scan/%s"
 )
 
 type ConnectionEntryList struct {
@@ -164,6 +165,26 @@ type ContextAppResp struct {
 		Website  string `json:"website,omitempty"`
 		Username string `json:"username,omitempty"`
 	}) `json:"profiles"`
+}
+
+type PoapApiResp []struct {
+	Owner   string `json:"owner"`
+	TokenID string `json:"tokenId"`
+	Event   struct {
+		ID          int    `json:"id"`
+		FancyID     string `json:"fancy_id"`
+		EventName   string `json:"name"`
+		EventUrl    string `json:"event_url"`
+		Image       string `json:"image_url"`
+		Country     string `json:"country,omitempty"`
+		City        string `json:"city,omitempty"`
+		Description string `json:"description"`
+		Year        int    `json:"year"`
+		StartDate   string `json:"start_date"`
+		EndDate     string `json:"end_date"`
+		ExpiryDate  string `json:"expiry_date"`
+		Supply      int    `json:"supply"`
+	} `json:"event"`
 }
 
 type ContextConnection struct {

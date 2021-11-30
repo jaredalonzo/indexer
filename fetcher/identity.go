@@ -16,11 +16,12 @@ func (f *fetcher) FetchIdentity(address string) (IdentityEntryList, error) {
 
 	// Part 1 - Demo data source
 	// Context API
-	go f.processContext(address, ch)
+	// go f.processContext(address, ch)
 	// Superrare API
-	go f.processSuperrare(address, ch)
+	// go f.processSuperrare(address, ch)
 	// Part 2 - Add other data source here
 	// TODO
+	go f.processPoap(address, ch)
 
 	// Final Part - Merge entry
 	for i := 0; i < IdentityApiCount; i++ {
@@ -183,4 +184,31 @@ func (f *fetcher) processSuperrare(address string, ch chan<- IdentityEntry) {
 	}
 
 	ch <- result
+}
+
+func (f *fetcher) processPoap(address string, ch chan<- IdentityEntry) {
+	var result IdentityEntry
+
+	body, err := sendRequest(f.httpClient, RequestArgs{
+		url:    fmt.Sprintf(PoapUrl, address),
+		method: "GET",
+	})
+	if err != nil {
+		result.Err = err
+		result.Msg = "[processPoap] fetch events failed"
+		ch <- result
+		return
+	}
+	poapProfiles := PoapApiResp{}
+	err = json.Unmarshal(body, &poapProfiles)
+	if err != nil {
+		result.Err = err
+		result.Msg = "[processPoap] poap api unmarshal failed"
+		ch <- result
+		return
+	}
+
+	for _, poapProfile := range poapProfiles {
+		fmt.Println(poapProfile.Event.EventName)
+	}
 }
