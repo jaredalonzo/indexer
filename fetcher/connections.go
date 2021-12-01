@@ -1,8 +1,10 @@
 package fetcher
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"go.uber.org/zap"
 )
@@ -19,6 +21,18 @@ func (f *fetcher) FetchConnections(address string) (results []ConnectionEntry, e
 	go f.processRaribleConn(address, ch)
 	// Part 2 - Add other data source here
 	// TODO
+
+	/* bounty: https://gitcoin.co/issue/cyberconnecthq/indexer/2/100027191 test sample
+	// this is a simple test for printing out all the addresses of token holders
+	// from the getPoaprecommendation func
+	// you can uncomment to verify the results are correct
+
+	test := f.getPoapRecommendation(address)
+
+	for _, i := range test {
+		fmt.Println(i.EventID, i.Address)
+	}
+	*/
 
 	// Final Part - Aggregate all data & convert ens domain & filter out invalid connections
 	for i := 0; i < ConnectionApiCount; i++ {
@@ -202,4 +216,92 @@ func addressFilter(addr string) bool {
 	} else {
 		return false
 	}
+}
+
+// This func will get all the poap events of the given address
+func (f *fetcher) processPoap(address string) []UserPoapIdentity {
+	var result []UserPoapIdentity
+
+	body, err := sendRequest(f.httpClient, RequestArgs{
+		url:    fmt.Sprintf(PoapUrl, address),
+		method: "GET",
+	})
+	if err != nil {
+		zap.L().With(zap.Error(err)).Error("[processPoap] request poap api error")
+		return nil
+	}
+	poapProfiles := PoapApiResp{}
+	err = json.Unmarshal(body, &poapProfiles)
+	if err != nil {
+		zap.L().With(zap.Error(err)).Error("[processPoap] poap api unmarshal failed")
+		return nil
+	}
+
+	for _, poapProfile := range poapProfiles {
+		var poapEvent UserPoapIdentity
+
+		poapEvent.EventID = strconv.Itoa(poapProfile.Event.ID)
+		poapEvent.EventDesc = poapProfile.Event.Description
+		poapEvent.TokenID = poapProfile.TokenID
+		poapEvent.EventName = poapProfile.Event.EventName
+		poapEvent.EventUrl = poapProfile.Event.EventUrl
+		result = append(result, poapEvent)
+	}
+
+	return result
+}
+
+// This func will process all the events from processPoap and get all the
+// recommendations for addresses that have redeemed their POAP NFTs from the same
+// event.
+
+// Some possible improvements: improve the nested for loop structure since each event
+// will query the POAP graph to get an array of results for one specific event ID
+func (f *fetcher) getPoapRecommendation(address string) []PoapRecommendation {
+	var result []PoapRecommendation
+
+	poapEvents := f.processPoap(address)
+	for _, event := range poapEvents {
+		id := event.EventID
+		poapQuery := map[string]string{
+			"query": fmt.Sprintf(`
+				{
+					event(id: "%s") {
+						tokens {
+							id
+							owner {
+								id
+							}
+						}
+					}
+				}
+			 `, id),
+		}
+		poapBody, _ := json.Marshal(poapQuery)
+		body, err := sendRequest(f.httpClient, RequestArgs{
+			url:    fmt.Sprintf(PoapSubgraphUrl),
+			method: "POST",
+			body:   bytes.NewBuffer(poapBody).Bytes(),
+		})
+		if err != nil {
+			zap.L().With(zap.Error(err)).Error("[getPoapRecommendation] request subgraph api error")
+			return nil // do we want to return nil if one of the graph requests fail?
+		}
+		poapGraph := PoapGraphResp{}
+		err = json.Unmarshal(body, &poapGraph)
+		if err != nil {
+			zap.L().With(zap.Error(err)).Error("[getPoapRecommendation] POAP subgraph unmarshal error")
+			return nil // do we want to return nil if one of the graph requests fail?
+		}
+
+		for _, token := range poapGraph.Data.Event.Tokens {
+			var poapRec PoapRecommendation
+
+			poapRec.Address = token.Owner.ID
+			poapRec.TokenID = token.ID
+			poapRec.EventID = id
+			result = append(result, poapRec)
+		}
+	}
+	return result
 }

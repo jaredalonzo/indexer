@@ -29,6 +29,7 @@ const (
 	RaribleFollowingUrl = "https://api-mainnet.rarible.com/marketplace/api/v4/followings?owner=%s"
 	RaribleFollowerUrl  = "https://api-mainnet.rarible.com/marketplace/api/v4/followers?user=%s"
 	PoapUrl             = "https://api.poap.xyz/actions/scan/%s"
+	PoapSubgraphUrl     = "https://api.thegraph.com/subgraphs/name/poap-xyz/poap"
 )
 
 type ConnectionEntryList struct {
@@ -146,6 +147,34 @@ type UserShowtimeIdentity struct {
 	OpenseaHandle    string
 	RaribleHandle    string
 	DataSource       string
+}
+
+type UserPoapIdentity struct {
+	EventID   string
+	EventDesc string
+	TokenID   string
+	EventName string
+	EventUrl  string
+}
+
+type PoapRecommendation struct {
+	Address string
+	EventID string
+	TokenID string
+}
+
+// This will be the data structure of the expected response from the POAP Graph query
+type PoapGraphResp struct {
+	Data struct {
+		Event struct {
+			Tokens []struct {
+				ID    string `json:"id"` // id of Token
+				Owner struct {
+					ID string `json:"id"` // address of Token owner
+				}
+			}
+		}
+	}
 }
 
 type RaribleConnectionResp struct {
